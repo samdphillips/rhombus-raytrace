@@ -64,7 +64,7 @@ def world:
 
 for:
   each j: 0..image_height
-  println(@str{Scanlines remaining: @(image_height - j)})
+  // println(@str{Scanlines remaining: @(image_height - j)})
   each i: 0..image_width
   def px_c = px00_loc + i * px_du + j * px_dv
   def ray_v = px_c - camera_center
