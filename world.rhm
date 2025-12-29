@@ -1,0 +1,21 @@
+#lang rhombus/static/and_meta
+
+import:
+  "interval.rhm" open
+  "ray.rhm" open
+  "surface.rhm" open
+
+export:
+  World
+
+class World(surfaces :: List.of(Surface)):
+  implements Surface
+
+  override method hit(r :: Ray, Interval(tmin, tmax)) :~ Hit:
+    for values(closest :~ maybe(Hit) = #false) (s: surfaces):
+      match s.hit(r, Interval(tmin, (closest?.t || tmax)))
+      | new_closest :: Hit: new_closest
+      | ~else: closest
+
+  export expr.macro 'build: $o; ...':
+    'World([$o, ...])'

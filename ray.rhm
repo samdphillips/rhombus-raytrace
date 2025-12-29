@@ -1,0 +1,13 @@
+#lang rhombus/static
+
+import:
+  "vec3.rhm" open
+
+export:
+  Ray
+
+class Ray(origin :: Vec3, dir :: Vec3):
+  implements Indexable
+
+  override method get(t :: Real) :~ Vec3:
+    origin + dir * t

@@ -1,0 +1,102 @@
+#lang rhombus/static/and_meta
+
+export:
+  Vec3
+  •
+  ×
+  rename:
+    ⊕ as +
+    ⊖ as -
+    ⊗ as *
+    ⊘ as /
+
+meta:
+  def vec3_key = '#{#%vec3_key}'
+  syntax_class Vec3Expr:
+    kind: ~group
+  | '$(e :: expr_meta.Parsed)':
+      match_when:
+        match statinfo_meta.lookup(e.group, vec3_key)
+        | '#true': #true
+        | ~else: #false
+
+class Vec3(x :: Real, y :: Real, z :: Real):
+  static_info:
+    '(($vec3_key, #true))'
+
+  method length_squared() :~ Real:
+    x * x + y * y + z * z
+
+  method length() :~ Real:
+    math.sqrt(length_squared())
+
+  method unit() :~ Vec3:
+    scale(1 / length())
+
+  method add(v :~ Vec3) :~ Vec3:
+    Vec3(x + v.x, y + v.y, z + v.z)
+
+  method sub(v :~ Vec3) :~ Vec3:
+    Vec3(x - v.x, y - v.y, z - v.z)
+
+  method scale(s :~ Real) :~ Vec3:
+    Vec3(x * s, y * s, z * s)
+
+operator_order.def vector:
+  ~stronger_than addition multiplication comparison
+
+operator ((u :: Vec3) • (v :: Vec3)) :~ Real:
+  ~order: vector
+  u.x * v.x + u.y * v.y + u.z * v.z
+
+operator ((u :: Vec3) × (v :: Vec3)) :: Vec3:
+  ~order: vector
+  Vec3(u.y * v.z - u.z * v.y,
+       u.z * v.x - u.x * v.z,
+       u.x * v.y - u.y * v.x)
+
+
+operator ⊕:
+  ~order: addition
+| (v0 :: Vec3) ⊕ (v1 :: Vec3):
+    v0.add(v1)
+| a ⊕ b:
+    a + b
+
+#//
+expr.macro ⊕:
+  ~order: addition
+| '$a ⊕ $b':
+    match values(a, b)
+    | values('$(a :: Vec3Expr)',
+             '$(b :: Vec3Expr)'):
+        '($a).add($b)'
+    | ~else:
+        '$a + $b'
+
+operator ⊖:
+  ~order: addition
+| (v0 :: Vec3) ⊖ (v1 :: Vec3):
+    v0.sub(v1)
+| a ⊖ b:
+    a - b
+| ⊖ (v :: Vec3):
+    Vec3(-v.x, -v.y, -v.z)
+| ⊖ a:
+    -a
+
+operator ⊗:
+  ~order: multiplication
+| (v :: Vec3) ⊗ (s :: Real):
+    v.scale(s)
+| (s :: Real) ⊗ (v :: Vec3):
+    v.scale(s)
+| a ⊗ b:
+    a * b
+
+operator ⊘:
+  ~order: multiplication
+| (v :: Vec3) ⊘ (s :: Real):
+    v ⊗ (1/s)
+| a ⊘ b:
+    a / b

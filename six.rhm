@@ -1,0 +1,84 @@
+#lang rhombus/static
+
+import:
+  rhombus/draw:
+    expose:
+      Bitmap
+      Color
+  "interval.rhm" open
+  "ray.rhm" open
+  "sphere.rhm" open
+  "surface.rhm" open
+  "vec3.rhm" open
+  "world.rhm" open
+
+def MAX_CVAL = 255.999
+
+fun ray_color(r :: Ray, w :: World) :: Color:
+  def c :~ Vec3:
+    match w.hit(r, Interval(0, #inf))
+    | Hit(_, normal, _, _):
+        (normal + Vec3(1, 1, 1)) / 2 * MAX_CVAL
+    | ~else:
+        def unit = r.dir.unit()
+        def a = (unit.y + 1) / 2
+        def c0 = 1 - a
+        def v0 = Vec3(c0, c0, c0)
+        def v1 = Vec3(0.5, 0.7, 1.0) * a
+        (v0 + v1) * MAX_CVAL
+  Color(math.exact(math.floor(c.x)),
+        math.exact(math.floor(c.y)),
+        math.exact(math.floor(c.z)))
+
+def aspect_ratio = 16 / 9
+def image_width = 800
+def image_height = math.floor(image_width / aspect_ratio)
+
+def focal_length = 1.0
+def viewport_height = 2.0
+def viewport_width = viewport_height * image_width / image_height
+def camera_center = Vec3(0,0,0)
+
+def viewport_u = Vec3(viewport_width, 0, 0)
+def viewport_v = Vec3(0, -viewport_height, 0)
+
+def px_du = viewport_u / image_width
+def px_dv = viewport_v / image_height
+
+def viewport_ul:
+  camera_center
+    - Vec3(0, 0, focal_length)
+    - viewport_u / 2
+    - viewport_v / 2
+
+def px00_loc:
+  viewport_ul + (px_du + px_dv) / 2
+
+def pixels:
+  Bytes.make(image_width * image_height * 4)
+
+def world:
+  World.build:
+    Sphere(Vec3(0, 0, -1), 0.5)
+    Sphere(Vec3(0, -100.5, -1), 100)
+
+for:
+  each j: 0..image_height
+  println(@str{Scanlines remaining: @(image_height - j)})
+  each i: 0..image_width
+  def px_c = px00_loc + i * px_du + j * px_dv
+  def ray_v = px_c - camera_center
+  def r = Ray(camera_center, ray_v)
+  def color = ray_color(r, world)
+
+  def o = (j * image_width + i) * 4
+  pixels[o + 0] := 255
+  pixels[o + 1] := color.red
+  pixels[o + 2] := color.green
+  pixels[o + 3] := color.blue
+
+def bm = Bitmap([image_width, image_height])
+bm.set_argb_pixels(pixels)
+bm.write("image.png", ~kind: #'png)
+
+println("Done")

@@ -1,0 +1,78 @@
+#lang rhombus/static
+
+import:
+  rhombus/draw:
+    expose:
+      Bitmap
+      Color
+  "vec3.rhm" open
+  "ray.rhm" open
+
+fun hit_sphere(center :: Vec3, radius :: Real, r :: Ray) :: Boolean:
+  def oc = center - r.origin
+  def a = r.dir • r.dir
+  def b = -2.0 * (r.dir • oc)
+  def c = (oc • oc) - radius * radius
+  def discriminant = b * b - 4 * a * c
+  discriminant >= 0
+
+fun ray_color(r :: Ray) :: Color:
+  if hit_sphere(Vec3(0, 0, -1), 0.5, r)
+  | Color(255, 0, 0)
+  | def unit = r.dir.unit()
+    def a = (unit.y + 1) / 2
+    def c0 = 1 - a
+    def v0 = Vec3(c0, c0, c0)
+    def v1 = Vec3(0.5, 0.7, 1.0) * a
+    def vb :~ Vec3 = (v0 + v1) * 255
+    Color(math.exact(math.floor(vb.x)),
+          math.exact(math.floor(vb.y)),
+          math.exact(math.floor(vb.z)))
+
+def aspect_ratio = 16 / 9
+def image_width = 800
+def image_height = math.floor(image_width / aspect_ratio)
+
+def focal_length = 1.0
+def viewport_height = 2.0
+def viewport_width = viewport_height * image_width / image_height
+def camera_center = Vec3(0,0,0)
+
+def viewport_u = Vec3(viewport_width, 0, 0)
+def viewport_v = Vec3(0, -viewport_height, 0)
+
+def px_du = viewport_u / image_width
+def px_dv = viewport_v / image_height
+
+def viewport_ul:
+  camera_center
+    - Vec3(0, 0, focal_length)
+    - viewport_u / 2
+    - viewport_v / 2
+
+def px00_loc:
+  viewport_ul + (px_du + px_dv) / 2
+
+def pixels:
+  Bytes.make(image_width * image_height * 4)
+
+for:
+  each j: 0..image_height
+  println(@str{Scanlines remaining: @(image_height - j)})
+  each i: 0..image_width
+  def px_c = px00_loc + i * px_du + j * px_dv
+  def ray_v = px_c - camera_center
+  def r = Ray(camera_center, ray_v)
+  def color = ray_color(r)
+
+  def o = (j * image_width + i) * 4
+  pixels[o + 0] := 255
+  pixels[o + 1] := color.red
+  pixels[o + 2] := color.green
+  pixels[o + 3] := color.blue
+
+def bm = Bitmap([image_width, image_height])
+bm.set_argb_pixels(pixels)
+bm.write("image.png", ~kind: #'png)
+
+println("Done")

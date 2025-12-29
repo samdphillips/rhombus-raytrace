@@ -1,0 +1,23 @@
+#lang rhombus/static
+
+import rhombus/draw
+
+def image_width = 256
+def image_height = 256
+
+def pixels:
+  Bytes.make(image_width * image_height * 4)
+
+for:
+  each j: 0..image_height
+  println(@str{Scanlines remaining: @(image_height - j)})
+  each i: 0..image_width
+  def o = (j * image_width + i) * 4
+  pixels[o + 0] := 255
+  pixels[o + 1] := i
+  pixels[o + 2] := j
+  pixels[o + 3] := 0
+
+def bm = draw.Bitmap([image_width, image_height])
+bm.set_argb_pixels(pixels)
+bm.write("image.png", ~kind: #'png)

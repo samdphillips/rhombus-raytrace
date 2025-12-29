@@ -1,0 +1,24 @@
+#lang rhombus/static
+
+import rhombus/draw
+
+def aspect_ratio = 16 / 9
+def image_width = 800
+def image_height = math.floor(image_width / aspect_ratio)
+
+def pixels:
+  Bytes.make(image_width * image_height * 4)
+
+for:
+  each j: 0..image_height
+  println(@str{Scanlines remaining: @(image_height - j)})
+  each i: 0..image_width
+  def o = (j * image_width + i) * 4
+  pixels[o + 0] := 255
+  pixels[o + 1] := math.floor(256 * i / image_width)
+  pixels[o + 2] := math.floor(256 * j / image_height)
+  pixels[o + 3] := 0
+
+def bm = draw.Bitmap([image_width, image_height])
+bm.set_argb_pixels(pixels)
+bm.write("image.png", ~kind: #'png)
