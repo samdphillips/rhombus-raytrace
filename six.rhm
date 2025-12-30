@@ -64,7 +64,8 @@ def world:
 
 for:
   each j: 0..image_height
-  // println(@str{Scanlines remaining: @(image_height - j)})
+  print(".")
+  when j mod 10 == 0 | print(j)
   each i: 0..image_width
   def px_c = px00_loc + i * px_du + j * px_dv
   def ray_v = px_c - camera_center
@@ -80,5 +81,4 @@ for:
 def bm = Bitmap([image_width, image_height])
 bm.set_argb_pixels(pixels)
 bm.write("image.png", ~kind: #'png)
-
-println("Done")
+bm
