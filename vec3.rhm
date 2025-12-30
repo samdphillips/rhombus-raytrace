@@ -1,5 +1,8 @@
 #lang rhombus/static/and_meta
 
+import:
+  rhombus/flonum
+
 export:
   Vec3
   •
@@ -10,9 +13,10 @@ export:
     ⊗ as *
     ⊘ as /
 
+
 meta:
-  def vec3_key = '#{#%vec3_key}'
-  syntax_class Vec3Expr:
+  def vec3_key = 'Vec3_Key'
+  syntax_class Vec3:
     kind: ~group
   | '$(e :: expr_meta.Parsed)':
       match_when:
@@ -20,18 +24,27 @@ meta:
         | '#true': #true
         | ~else: #false
 
-class Vec3(x :: Real, y :: Real, z :: Real):
+annot.macro 'ToFlonum':
+  'converting(fun (n :: Number) :: Flonum:
+                match n
+                | n :: Flonum: n
+                | i :: Int: flonum.from_int(i)
+                | r :: Real: r + 0.0)'
+
+class Vec3(x :: ToFlonum, y :: ToFlonum, z :: ToFlonum):
   static_info:
     '(($vec3_key, #true))'
 
-  method length_squared() :~ Real:
+  export origin
+
+  method length_squared() :~ Flonum:
     x * x + y * y + z * z
 
-  method length() :~ Real:
-    math.sqrt(length_squared())
+  method length() :~ Flonum:
+    flonum.sqrt(length_squared())
 
   method unit() :~ Vec3:
-    scale(1 / length())
+    scale(1.0 / length())
 
   method add(v :~ Vec3) :~ Vec3:
     Vec3(x + v.x, y + v.y, z + v.z)
@@ -39,8 +52,10 @@ class Vec3(x :: Real, y :: Real, z :: Real):
   method sub(v :~ Vec3) :~ Vec3:
     Vec3(x - v.x, y - v.y, z - v.z)
 
-  method scale(s :~ Real) :~ Vec3:
+  method scale(s :: ToFlonum) :~ Vec3:
     Vec3(x * s, y * s, z * s)
+
+def origin = Vec3(0, 0, 0)
 
 operator_order.def vector:
   ~stronger_than addition multiplication comparison
@@ -55,48 +70,48 @@ operator ((u :: Vec3) × (v :: Vec3)) :: Vec3:
        u.z * v.x - u.x * v.z,
        u.x * v.y - u.y * v.x)
 
-
-operator ⊕:
-  ~order: addition
-| (v0 :: Vec3) ⊕ (v1 :: Vec3):
-    v0.add(v1)
-| a ⊕ b:
-    a + b
-
-#//
 expr.macro ⊕:
   ~order: addition
 | '$a ⊕ $b':
     match values(a, b)
-    | values('$(a :: Vec3Expr)',
-             '$(b :: Vec3Expr)'):
+    | values('$(a :: Vec3)',
+             '$(b :: Vec3)'):
         '($a).add($b)'
     | ~else:
         '$a + $b'
 
-operator ⊖:
+expr.macro ⊖:
   ~order: addition
-| (v0 :: Vec3) ⊖ (v1 :: Vec3):
-    v0.sub(v1)
-| a ⊖ b:
-    a - b
-| ⊖ (v :: Vec3):
-    Vec3(-v.x, -v.y, -v.z)
-| ⊖ a:
-    -a
+| '⊖ $a':
+    match a
+    | '$(a :: Vec3)':
+        'Vec3.origin.sub($a)'
+    | ~else:
+        '- $a'
+| '$a ⊖ $b':
+    match values(a, b)
+    | values('$(a :: Vec3)',
+             '$(b :: Vec3)'):
+        '($a).sub($b)'
+    | ~else:
+        '$a - $b'
 
-operator ⊗:
+expr.macro ⊗:
   ~order: multiplication
-| (v :: Vec3) ⊗ (s :: Real):
-    v.scale(s)
-| (s :: Real) ⊗ (v :: Vec3):
-    v.scale(s)
-| a ⊗ b:
-    a * b
+| '$a ⊗ $b':
+    match values(a, b)
+    | values('$(a :: Vec3)', _):
+        '($a).scale($b)'
+    | values(_, '$(b :: Vec3)'):
+        '$(b).scale($a)'
+    | ~else:
+        '$a * $b'
 
-operator ⊘:
+expr.macro ⊘:
   ~order: multiplication
-| (v :: Vec3) ⊘ (s :: Real):
-    v ⊗ (1/s)
-| a ⊘ b:
-    a / b
+| '$a ⊘ $b':
+    match a
+    | '$(a :: Vec3)':
+        '($a).scale(1 / ($b))'
+    | ~else:
+        '$a / $b'
