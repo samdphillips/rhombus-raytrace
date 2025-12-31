@@ -1,0 +1,19 @@
+#lang rhombus/static
+
+import:
+  "interval.rhm" open
+  "ray.rhm" open
+  "vec3.rhm":
+    expose Vec3
+
+export:
+  Surface
+  Hit
+
+class Hit(p :: Vec3,
+          n :: Vec3,
+          t :: Real,
+          front_face :: Boolean)
+
+interface Surface:
+  method hit(r :: Ray, ray_t :: Interval) :~ maybe(Hit)
