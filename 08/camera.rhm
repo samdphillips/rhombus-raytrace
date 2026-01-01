@@ -1,0 +1,115 @@
+#lang rhombus/static/and_meta
+
+import:
+  draw:
+    expose Bitmap
+  rhombus/flonum
+  "random.rhm"
+
+  "interval.rhm" open
+  "ray.rhm" open
+  "scene.rhm" open
+  "surface.rhm" open
+  "vec3.rhm" open
+
+export:
+  Camera
+
+def MAX_CVAL = 255.999
+
+def intensity = Interval(0.000, 0.999)
+fun to_comp(v :~ Flonum) :~ Byte:
+  flonum.to_int(flonum.floor(MAX_CVAL * intensity.clamp(v)))
+
+class Camera(~image_width: image_width :: PosInt,
+             ~image_height: image_height :: PosInt,
+             ~camera_center: camera_center :: Vec3,
+             ~px_origin: px_origin :: Vec3,
+             ~px_du: px_du :: Vec3,
+             ~px_dv: px_dv :: Vec3,
+             ~samples_per_pixel: samples_per_pixel :: PosInt):
+
+  constructor (~aspect_ratio: aspect_ratio :: Real = 1.0,
+               ~image_width: image_width :: PosInt = 100,
+               ~samples_per_pixel: samples_per_pixel :: PosInt = 10):
+    def image_height:
+      let image_height = math.exact(math.floor(image_width / aspect_ratio))
+      if image_height < 1 | 1 | image_height
+
+    def camera_center = Vec3.origin
+
+    def values(px_du, px_dv, px_origin):
+      def focal_length = 1.0
+      def viewport_height = 2.0
+      def viewport_width = viewport_height * (0.0 + image_width) / image_height
+      def viewport_u = Vec3(viewport_width, 0, 0)
+      def viewport_v = Vec3(0, -viewport_height, 0)
+      def px_du = viewport_u / image_width
+      def px_dv = viewport_v / image_height
+      def viewport_ul:
+        camera_center - Vec3(0, 0, focal_length) - viewport_u / 2 - viewport_v / 2
+      def px00_loc:
+        viewport_ul + (px_du + px_dv) / 2
+      values(px_du, px_dv, px00_loc)
+
+    super(~image_width: image_width,
+          ~image_height: image_height,
+          ~camera_center: camera_center,
+          ~px_origin: px_origin,
+          ~px_du: px_du,
+          ~px_dv: px_dv,
+          ~samples_per_pixel: samples_per_pixel)
+
+  method render(scene :: Scene) :~ Bitmap:
+    def pixel_samples_scale = 1.0 / samples_per_pixel
+
+    def pixels:
+      Bytes.make(image_width * image_height * 4)
+
+    // Render loop
+    for:
+      each j: 0..image_height
+      print(".")
+      when j mod 10 == 0 | print(str.f(~precision: 2, 100 * j / image_height))
+      each i: 0..image_width
+
+      def color :~ Vec3:
+        // cannot annotate the following line or Vec3 statinfo gets weird
+        let color:
+          for values(color :~ Vec3 = Vec3.origin) (sn: 0..samples_per_pixel):
+            def ray = get_ray(i, j)
+            color + ray_color(ray, scene)
+        color * pixel_samples_scale
+
+      def o = (j * image_width + i) * 4
+      pixels[o + 0] := 255
+      pixels[o + 1] := to_comp(color.x)
+      pixels[o + 2] := to_comp(color.y)
+      pixels[o + 3] := to_comp(color.z)
+
+    println("")
+    def bm = Bitmap([image_width, image_height])
+    bm.set_argb_pixels(pixels)
+    bm
+
+  private method get_ray(i :~ Nat, j :~ Nat) :~ Ray:
+    def values(off_x :~ Flonum, off_y :~ Flonum) = sample_square()
+    def px_c = px_origin + (off_x + i) * px_du + (off_y + j) * px_dv
+    def ray_v = px_c - camera_center
+    Ray(camera_center, ray_v)
+
+  private method sample_square() :~ values(Flonum, Flonum):
+    values(random.double() - 0.5,
+           random.double() - 0.5)
+
+  private method ray_color(r :~ Ray, s :~ Surface) :~ Vec3:
+    match s.hit(r, Interval(0, #inf))
+    | Hit(_, normal, _, _):
+        (normal + Vec3(1, 1, 1)) / 2
+    | ~else:
+        def unit = r.dir.unit()
+        def a = (unit.y + 1) / 2
+        def c0 = 1 - a
+        def v0 = Vec3(c0, c0, c0)
+        def v1 = Vec3(0.5, 0.7, 1.0) * a
+        v0 + v1

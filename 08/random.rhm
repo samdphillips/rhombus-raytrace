@@ -1,0 +1,8 @@
+#lang rhombus/static
+
+export:
+  interval
+  rename math.random as double
+
+fun interval(start :: Real, end :: Real) :~ Real:
+  math.random() * (end - start) + start
