@@ -4,6 +4,7 @@ import:
   draw:
     expose Bitmap
   rhombus/flonum
+  rhombus/thread open
   "random.rhm"
 
   "interval.rhm" open
@@ -29,12 +30,14 @@ class Camera(~image_width: image_width :: PosInt,
              ~px_du: px_du :: Vec3,
              ~px_dv: px_dv :: Vec3,
              ~samples_per_pixel: samples_per_pixel :: PosInt,
-             ~max_depth: max_depth :: PosInt):
+             ~max_depth: max_depth :: PosInt,
+             ~num_threads: num_threads :: PosInt):
 
   constructor (~aspect_ratio: aspect_ratio :: Real = 1.0,
                ~image_width: image_width :: PosInt = 100,
                ~samples_per_pixel: samples_per_pixel :: PosInt = 10,
-               ~max_depth: max_depth :: PosInt = 10):
+               ~max_depth: max_depth :: PosInt = 10,
+               ~num_threads: num_threads :: PosInt = 1):
     def image_height:
       let image_height = math.exact(math.floor(image_width / aspect_ratio))
       if image_height < 1 | 1 | image_height
@@ -64,7 +67,8 @@ class Camera(~image_width: image_width :: PosInt,
           ~px_du: px_du,
           ~px_dv: px_dv,
           ~samples_per_pixel: samples_per_pixel,
-          ~max_depth: max_depth)
+          ~max_depth: max_depth,
+          ~num_threads: num_threads)
 
   method render(scene :: Scene) :~ Bitmap:
     def pixel_samples_scale = 1.0 / samples_per_pixel
@@ -72,28 +76,40 @@ class Camera(~image_width: image_width :: PosInt,
     def pixels:
       Bytes.make(image_width * image_height * 4)
 
+    // Thread.Pool is not Closeable
+    // Closeable.let render_pool = Thread.Pool()
+    def render_pool = Thread.Pool(num_threads)
+
+    def block_size = math.ceiling(image_height / num_threads)
+
     // Render loop
-    for:
-      each j: 0..image_height
-      print(".")
-      when j mod 10 == 0 | print(str.f(~precision: 2, 100 * j / image_height))
-      each i: 0..image_width
+    def workers:
+      for List:
+        each j0: (0..image_height).step_by(block_size)
+        def jz: math.min(j0 + block_size, image_height)
+        thread:
+          ~pool: render_pool
+          for:
+            each j: j0 .. jz
+            each i: 0..image_width
+            def color :~ Vec3:
+              // cannot annotate the following line or Vec3 statinfo gets weird
+              let color:
+                for values(color :~ Vec3 = Vec3.origin):
+                  each sn: 0..samples_per_pixel
+                  def ray = get_ray(i, j)
+                  color + ray_color(ray, scene)
+              color * pixel_samples_scale
 
-      def color :~ Vec3:
-        // cannot annotate the following line or Vec3 statinfo gets weird
-        let color:
-          for values(color :~ Vec3 = Vec3.origin) (sn: 0..samples_per_pixel):
-            def ray = get_ray(i, j)
-            color + ray_color(ray, scene)
-        color * pixel_samples_scale
+            def o = (j * image_width + i) * 4
+            pixels[o + 0] := 255
+            pixels[o + 1] := to_comp(color.x)
+            pixels[o + 2] := to_comp(color.y)
+            pixels[o + 3] := to_comp(color.z)
 
-      def o = (j * image_width + i) * 4
-      pixels[o + 0] := 255
-      pixels[o + 1] := to_comp(color.x)
-      pixels[o + 2] := to_comp(color.y)
-      pixels[o + 3] := to_comp(color.z)
+    for (w :~ Thread: workers): w.wait()
+    render_pool.close()
 
-    println("")
     def bm = Bitmap([image_width, image_height])
     bm.set_argb_pixels(pixels)
     bm
