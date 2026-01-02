@@ -1,0 +1,14 @@
+#lang rhombus/static/and_meta
+
+import:
+  rhombus/flonum
+
+export:
+  ToFlonum
+
+annot.macro 'ToFlonum':
+  'converting(fun (n :: Number) :: Flonum:
+                match n
+                | n :: Flonum: n
+                | i :: Int: flonum.from_int(i)
+                | r :: Real: r + 0.0)'

@@ -1,0 +1,141 @@
+#lang rhombus/static/and_meta
+
+import:
+  rhombus/flonum
+  "random.rhm"
+  "flonum.rhm" open
+
+export:
+  check_vec3
+  Vec3
+  •
+  ×
+  rename:
+    ⊕ as +
+    ⊖ as -
+    ⊗ as *
+    ⊘ as /
+
+meta:
+  def vec3_key = 'Vec3_Key'
+  syntax_class Vec3:
+    kind: ~group
+  | '$(e :: expr_meta.Parsed)':
+      match_when:
+        match statinfo_meta.lookup(e.group, vec3_key)
+        | '#true': #true
+        | ~else: #false
+
+expr.macro 'check_vec3($a)':
+  println(statinfo_meta.gather(a))
+  println(statinfo_meta.lookup(a, vec3_key))
+  '#void'
+
+class Vec3(x :: ToFlonum, y :: ToFlonum, z :: ToFlonum):
+  static_info:
+    '(($vec3_key, #true))'
+
+  export:
+    origin
+    rename:
+      vec_random as random
+      vec_random_unit as random_unit
+      vec_random_on_hemisphere as random_on_hemisphere
+
+  method length_squared() :~ Flonum:
+    x * x + y * y + z * z
+
+  method length() :~ Flonum:
+    flonum.sqrt(length_squared())
+
+  method unit() :~ Vec3:
+    scale(1.0 / length())
+
+  method add(v :~ Vec3) :~ Vec3:
+    Vec3(x + v.x, y + v.y, z + v.z)
+
+  method sub(v :~ Vec3) :~ Vec3:
+    Vec3(x - v.x, y - v.y, z - v.z)
+
+  method scale(s :: ToFlonum) :~ Vec3:
+    Vec3(x * s, y * s, z * s)
+
+def origin = Vec3(0, 0, 0)
+
+fun vec_random :~ Vec3
+| vec_random():
+    Vec3(random.double(), random.double(), random.double())
+| vec_random(start :: Real, end :: Real):
+    Vec3(random.double(start, end),
+         random.double(start, end),
+         random.double(start, end))
+
+fun vec_random_unit() :~ Vec3:
+  def p = Vec3.random(-1, 1)
+  def lensq = p.length_squared()
+  if 1e-160 < lensq && lensq <= 1
+  | p ⊘ flonum.sqrt(lensq)
+  | vec_random_unit()
+
+fun vec_random_on_hemisphere(normal :: Vec3) :~ Vec3:
+  def u = Vec3.random_unit()
+  if u • normal > 0.0 | u | Vec3.origin.sub(u)
+
+operator_order.def vector:
+  ~stronger_than addition multiplication comparison
+
+operator ((u :: Vec3) • (v :: Vec3)) :~ Real:
+  ~order: vector
+  u.x * v.x + u.y * v.y + u.z * v.z
+
+operator ((u :: Vec3) × (v :: Vec3)) :: Vec3:
+  ~order: vector
+  Vec3(u.y * v.z - u.z * v.y,
+       u.z * v.x - u.x * v.z,
+       u.x * v.y - u.y * v.x)
+
+expr.macro ⊕:
+  ~order: addition
+| '$a ⊕ $b':
+    match values(a, b)
+    | values('$(a :: Vec3)',
+             '$(b :: Vec3)'):
+        '($a).add($b)'
+    | ~else:
+        '$a + $b'
+
+expr.macro ⊖:
+  ~order: addition
+| '⊖ $a':
+    match a
+    | '$(a :: Vec3)':
+        'Vec3.origin.sub($a)'
+    | ~else:
+        '- $a'
+| '$a ⊖ $b':
+    match values(a, b)
+    | values('$(a :: Vec3)',
+             '$(b :: Vec3)'):
+        '($a).sub($b)'
+    | ~else:
+        '$a - $b'
+
+expr.macro ⊗:
+  ~order: multiplication
+| '$a ⊗ $b':
+    match values(a, b)
+    | values('$(a :: Vec3)', _):
+        '($a).scale($b)'
+    | values(_, '$(b :: Vec3)'):
+        '$(b).scale($a)'
+    | ~else:
+        '$a * $b'
+
+expr.macro ⊘:
+  ~order: multiplication
+| '$a ⊘ $b':
+    match a
+    | '$(a :: Vec3)':
+        '($a).scale(1 / ($b))'
+    | ~else:
+        '$a / $b'

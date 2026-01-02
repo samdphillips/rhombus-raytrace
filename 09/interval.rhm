@@ -1,0 +1,16 @@
+#lang rhombus/static/and_meta
+
+import "flonum.rhm" open
+
+export:
+  Interval
+
+class Interval(min :: ToFlonum, max :: ToFlonum):
+  method surrounds(x :: ToFlonum) :: Boolean:
+    min < x && x < max
+
+  method clamp(v :: ToFlonum) :~ Flonum:
+    cond
+    | v < min: min
+    | v > max: max
+    | ~else: v

@@ -1,0 +1,10 @@
+#lang rhombus/static
+
+export:
+  rename random as double
+
+fun random
+| random():
+    math.random()
+| random(start :: Real, end :: Real) :~ Real:
+    math.random() * (end - start) + start
