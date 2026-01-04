@@ -1,0 +1,21 @@
+#lang rhombus/static/and_meta
+
+import:
+  lib("racket/base.rkt"):
+    only #{box-cas!}
+    rename #{box-cas!} as box_cas
+    expose box_cas
+
+export Counter
+
+veneer Counter(this :: MutableBox):
+  constructor (): Box(0)
+
+  private method compare_and_set(old, new) :~ Boolean:
+    box_cas(this, old, new)
+
+  method next() :~ Nat:
+    let v = this.value
+    if compare_and_set(v, v + 1)
+    | v
+    | next()

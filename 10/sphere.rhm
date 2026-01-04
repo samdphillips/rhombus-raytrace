@@ -1,0 +1,39 @@
+#lang rhombus/static
+
+import:
+  "interval.rhm" open
+  "ray.rhm" open
+  "surface.rhm" open
+  "vec3.rhm" open
+
+export Sphere
+
+class Sphere(center :: Vec3, radius :: Real):
+  implements Surface
+
+  override method hit(r :: Ray, ray_t :: Interval) :~ maybe(Hit):
+    def oc :~ Vec3 = center - r.origin
+    def a = r.dir.length_squared()
+    def h = r.dir • oc
+    def c = oc.length_squared() - radius * radius
+    def discriminant = h * h - a * c
+    guard discriminant >= 0
+    | #false
+
+    def disc_root = math.sqrt(discriminant)
+    def root:
+      let root = (h - disc_root) / a
+      if !ray_t.surrounds(root)
+      | let root = (h + disc_root) / a
+        if !ray_t.surrounds(root) | #false | root
+      | root
+
+    root
+      && (block:
+            let p = r[root]
+            let n = (p - center) / radius
+            let front_face = r.dir • n < 0
+            Hit(p,
+                if front_face | n | -n,
+                root,
+                front_face))

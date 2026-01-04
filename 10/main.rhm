@@ -1,0 +1,65 @@
+#lang rhombus/static
+
+import:
+  rhombus/measure
+  rhombus/random: expose Random
+  "camera.rhm" open
+  "scene.rhm" open
+  "sphere.rhm" open
+  "vec3.rhm":
+    only Vec3
+    expose Vec3
+
+def scene:
+  Scene.build:
+    Sphere(Vec3(0, 0, -1), 0.5)
+    Sphere(Vec3(0, -100.5, -1), 100)
+
+#//
+def num_threads:
+  import rhombus/cmdline open
+  let p:
+    parser:
+      flag "-t" (t :: String.to_int)
+  match p.parse()
+  | {#'t: num_threads}: num_threads
+
+Random.current(Random(Array(12, 7, 1977, 6, 6, 1976)))
+
+#//
+def camera = Camera(~aspect_ratio: 16/9,
+                    ~image_width: 400,
+                    ~samples_per_pixel: 100,
+                    ~max_depth: 50,
+                    ~num_threads: num_threads)
+
+#//
+block:
+  import:
+    lib("future-visualizer/main.rkt"):
+      rename:
+        #{visualize-futures-thunk} as visualize_futures
+      expose:
+        visualize_futures
+  visualize_futures(fun (): camera.render(scene))
+
+#//
+block:
+  import rhombus/memory
+  for List (t: 1..=10):
+    memory.gc()
+    memory.gc()
+    memory.gc()
+    print(@str{@str.d(~width: 2, t) })
+    measure.time:
+      def camera = Camera(~aspect_ratio: 1,
+                          ~image_width: 200,
+                          ~num_threads: t)
+      camera.render(scene)
+
+// camera.render(scene).write(~kind: #'png, "image.png")
+
+measure.time:
+  def camera = Camera(~image_width: 400,
+                      ~num_threads: 4)
+  camera.render(scene)
