@@ -1,0 +1,85 @@
+#lang rhombus/static/and_meta
+
+import:
+  "flonum.rhm" open
+  "material_fwd.rhm"
+  "ray.rhm" open
+  "surface.rhm" open
+  "vec3.rhm" open
+
+export:
+  Material
+  Lambertian
+  Metal
+
+interface Material:
+  method should_scatter(ray :: Ray, hit :: Hit) :~ Boolean:
+    #true
+
+  method scatter_ray(ray :: Ray, hit :: Hit) :~ Ray
+  method scatter_attenuation(ray :: Ray, hit :: Hit) :~ Vec3
+
+  method do_scatter(ray :: Ray, hit :: Hit, on_scatter, on_absorb):
+    if should_scatter(ray, hit)
+    | on_scatter(scatter_attenuation(ray, hit), scatter_ray(ray, hit))
+    | on_absorb()
+
+  export expr.macro 'scatter($ray_expr, $hit_expr)
+                     | ($(attenuation_bind :: bind_meta.Parsed),
+                        $(ray_bind :: bind_meta.Parsed)):
+                         $scatter_body
+                         ...
+                     | ~else:
+                         $absorb_body
+                         ...':
+    'block:
+       let hit = ($hit_expr) :: Hit
+       fun on_scatter($attenuation_bind, $ray_bind):
+         $scatter_body
+         ...
+       fun on_absorb():
+         $absorb_body
+         ...
+       Material.do_scatter(hit.material,
+                           $ray_expr,
+                           hit,
+                           on_scatter,
+                           on_absorb)'
+
+annot.delayed_complete material_fwd.MaterialFwd: Material
+
+/* From text (worth experimenting):
+Note the third option: we could scatter with some fixed probability p
+and have attenuation be albedo/p.
+*/
+class Lambertian(albedo :: Vec3):
+  implements Material
+
+  override method scatter_ray(ray :~ Ray, hit :~ Hit):
+    def scatter_dir:
+      let s = hit.normal + Vec3.random_unit()
+      if s.is_near_zero() | hit.normal | s
+    Ray(hit.p, scatter_dir)
+
+  override method scatter_attenuation(_ray, _hit):
+    albedo
+
+class Metal(albedo :: Vec3, fuzz :: ToFlonum):
+  implements Material
+
+  constructor (albedo, fuzz = 0):
+    super(albedo, if fuzz < 1 | fuzz | 1)
+
+  override method scatter_ray(ray :~ Ray, hit :~ Hit):
+    def reflected:
+      ray.dir.reflect(hit.normal).unit() + fuzz * Vec3.random_unit()
+    Ray(hit.p, reflected)
+
+  override method scatter_attenuation(_, _):
+    albedo
+
+  override method do_scatter(ray :~ Ray, hit :~ Hit, on_scatter, on_absorb):
+    def scattered = scatter_ray(ray, hit)
+    if scattered.dir • hit.normal > 0
+    | on_scatter(scatter_attenuation(ray, hit), scattered)
+    | on_absorb()

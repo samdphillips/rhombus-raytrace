@@ -1,14 +1,17 @@
-#lang rhombus/static
+#lang rhombus/static/and_meta
 
 import:
+  rhombus/flonum
+  "flonum.rhm" open
   "interval.rhm" open
+  "material.rhm" open
   "ray.rhm" open
   "surface.rhm" open
   "vec3.rhm" open
 
 export Sphere
 
-class Sphere(center :: Vec3, radius :: Real):
+class Sphere(center :: Vec3, radius :: ToFlonum, material :: Material):
   implements Surface
 
   override method hit(r :: Ray, ray_t :: Interval) :~ maybe(Hit):
@@ -20,8 +23,8 @@ class Sphere(center :: Vec3, radius :: Real):
     guard discriminant >= 0
     | #false
 
-    def disc_root = math.sqrt(discriminant)
-    def root:
+    def disc_root = flonum.sqrt(discriminant)
+    def root :~ maybe(Flonum):
       let root = (h - disc_root) / a
       if !ray_t.surrounds(root)
       | let root = (h + disc_root) / a
@@ -30,10 +33,12 @@ class Sphere(center :: Vec3, radius :: Real):
 
     root
       && (block:
+            let root :~ Flonum = root
             let p = r[root]
             let n = (p - center) / radius
             let front_face = r.dir • n < 0
             Hit(p,
                 if front_face | n | -n,
+                material,
                 root,
                 front_face))

@@ -2,18 +2,30 @@
 
 import:
   rhombus/measure
+  rhombus/memory
   rhombus/random: expose Random
   "camera.rhm" open
+  "material.rhm" open
   "scene.rhm" open
   "sphere.rhm" open
   "vec3.rhm":
     only Vec3
     expose Vec3
 
+def ground_mat = Lambertian(Vec3(0.8, 0.8, 0.0))
+def center_mat = Lambertian(Vec3(0.1, 0.2, 0.5))
+def left_mat = Metal(Vec3(0.8, 0.8, 0.8), 0.3)
+def right_mat = Metal(Vec3(0.8, 0.6, 0.2), 1)
+
+// def ground_mat = Lambertian(Vec3(0.2, 0.8, 0.0))
+// def center_mat = Lambertian(Vec3(0.9, 0.1, 0.5))
+
 def scene:
   Scene.build:
-    Sphere(Vec3(0, 0, -1), 0.5)
-    Sphere(Vec3(0, -100.5, -1), 100)
+    Sphere(Vec3(0, -100.5, -1), 100, ground_mat)
+    Sphere(Vec3( 0, 0, -1.2), 0.5, center_mat)
+    Sphere(Vec3(-1, 0, -1), 0.5, left_mat)
+    Sphere(Vec3( 1, 0, -1), 0.5, right_mat)
 
 #//
 def num_threads:
@@ -41,6 +53,13 @@ block:
         #{visualize-futures-thunk} as visualize_futures
       expose:
         visualize_futures
+  memory.gc()
+  memory.gc()
+  memory.gc()
+  def camera = Camera(~aspect_ratio: 16/9,
+                      ~image_width: 400,
+                      ~samples_per_pixel: 20,
+                      ~num_threads: 4)
   visualize_futures(fun (): camera.render(scene))
 
 #//
@@ -59,7 +78,15 @@ block:
 
 // camera.render(scene).write(~kind: #'png, "image.png")
 
-measure.time:
-  def camera = Camera(~image_width: 400,
-                      ~num_threads: 4)
-  camera.render(scene)
+
+block:
+  memory.gc()
+  memory.gc()
+  memory.gc()
+  measure.time:
+    def camera = Camera(~aspect_ratio: 16/9,
+                        ~image_width: 400,
+                        // ~samples_per_pixel: 100,
+                        // ~max_depth: 50,
+                        ~num_threads: 4)
+    camera.render(scene) // .write(~kind: #'png, "image.png")

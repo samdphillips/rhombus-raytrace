@@ -37,6 +37,7 @@ class Vec3(x :: ToFlonum, y :: ToFlonum, z :: ToFlonum):
 
   export:
     origin
+    identity
     rename:
       vec_random as random
       vec_random_unit as random_unit
@@ -49,7 +50,13 @@ class Vec3(x :: ToFlonum, y :: ToFlonum, z :: ToFlonum):
     flonum.sqrt(length_squared())
 
   method unit() :~ Vec3:
-    scale(1.0 / length())
+    scale_scalar(1.0 / length())
+
+  method is_near_zero():
+    def s :~ Flonum = 1e-8
+    flonum.abs(x) < s
+      && flonum.abs(y) < s
+      && flonum.abs(z) < s
 
   method add(v :~ Vec3) :~ Vec3:
     Vec3(x + v.x, y + v.y, z + v.z)
@@ -57,10 +64,17 @@ class Vec3(x :: ToFlonum, y :: ToFlonum, z :: ToFlonum):
   method sub(v :~ Vec3) :~ Vec3:
     Vec3(x - v.x, y - v.y, z - v.z)
 
-  method scale(s :: ToFlonum) :~ Vec3:
+  method scale_scalar(s :: ToFlonum) :~ Vec3:
     Vec3(x * s, y * s, z * s)
 
+  method scale_vec3(v :~ Vec3) :~ Vec3:
+    Vec3(x * v.x, y * v.y, z * v.z)
+
+  method reflect(normal :~ Vec3) :~ Vec3:
+    this.sub(2 * this • normal ⊗ normal)
+
 def origin = Vec3(0, 0, 0)
+def identity = Vec3(1, 1, 1)
 
 fun vec_random :~ Vec3
 | vec_random():
@@ -84,7 +98,7 @@ fun vec_random_on_hemisphere(normal :: Vec3) :~ Vec3:
 operator_order.def vector:
   ~stronger_than addition multiplication comparison
 
-operator ((u :: Vec3) • (v :: Vec3)) :~ Real:
+operator ((u :: Vec3) • (v :: Vec3)) :~ Flonum:
   ~order: vector
   u.x * v.x + u.y * v.y + u.z * v.z
 
@@ -124,10 +138,12 @@ expr.macro ⊗:
   ~order: multiplication
 | '$a ⊗ $b':
     match values(a, b)
+    | values('$(a :: Vec3)', '$(b :: Vec3)'):
+        '($a).scale_vec3($b)'
     | values('$(a :: Vec3)', _):
-        '($a).scale($b)'
+        '($a).scale_scalar($b)'
     | values(_, '$(b :: Vec3)'):
-        '$(b).scale($a)'
+        '$(b).scale_scalar($a)'
     | ~else:
         '$a * $b'
 
@@ -136,6 +152,6 @@ expr.macro ⊘:
 | '$a ⊘ $b':
     match a
     | '$(a :: Vec3)':
-        '($a).scale(1 / ($b))'
+        '($a).scale_scalar(1 / ($b))'
     | ~else:
         '$a / $b'

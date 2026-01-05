@@ -1,0 +1,5 @@
+#lang rhombus/static/and_meta
+
+export MaterialFwd
+
+annot.delayed_declare MaterialFwd

@@ -9,6 +9,7 @@ import:
 
   "counter.rhm" open
   "interval.rhm" open
+  "material.rhm" open
   "ray.rhm" open
   "scene.rhm" open
   "surface.rhm" open
@@ -130,18 +131,21 @@ class Camera(~image_width: image_width :: PosInt,
     values(random.double() - 0.5,
            random.double() - 0.5)
 
-  private method ray_color(r :~ Ray, s :~ Surface) :~ Vec3:
-    recur bounce(r :~ Ray = r,
+  private method ray_color(ray :~ Ray, surface :~ Surface) :~ Vec3:
+    recur bounce(ray :~ Ray = ray,
                  depth :~ Nat = max_depth,
-                 attenuation :~ Real = 1):
+                 attenuation :~ Vec3 = Vec3.identity):
       if depth <= 0
       | Vec3.origin
-      | match s.hit(r, Interval(0.001, #inf))
-        | Hit(p, normal, _, _):
-            def dir = normal + Vec3.random_unit()
-            bounce(Ray(p, dir), depth - 1, attenuation * 0.5)
+      | match surface.hit(ray, Interval(0.001, #inf))
+        | hit :: Hit:
+            Material.scatter(ray, hit)
+            | (scatter_atten :~ Vec3, scattered_ray :~ Ray):
+                bounce(scattered_ray, depth - 1, attenuation * scatter_atten)
+            | ~else:
+                Vec3.origin
         | ~else:
-            def unit = r.dir.unit()
+            def unit = ray.dir.unit()
             def a = (unit.y + 1) / 2
             def c0 = 1 - a
             def v0 = Vec3(c0, c0, c0)
